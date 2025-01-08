@@ -22,6 +22,8 @@ import numpy as np
 import h5py
 import multiprocessing
 import scipy.io as io
+import matplotlib
+
 import matplotlib.pyplot as plt
 from sklearn.decomposition import FastICA
 import scipy
@@ -42,6 +44,9 @@ import util.console_output as co
 
 # Alias useful functions
 pjoin = os.path.join
+
+# Set backend
+matplotlib.use('Agg')
 
 # Set up the pipeline log.  It is configured in the constructor below,
 # but used by the free functions outside of the class, hence its        
@@ -297,20 +302,30 @@ class Preprocessing(object):
             for f in filenames:
                 raw = load_file(f)
 
+                print(f"{data_type} file: {f}, channels: {raw.info['nchan']}, sfreq: {raw.info['sfreq']}")
+
                 # If filtering separately, apply filters to each raw dataset before concatenation
                 if self.filter_raws_separately:
                     filtered_raw = apply_filtering(raw)
                     data_list.append(filtered_raw)
                     if len(data_list) == len(filenames):
+                        for i, raw in enumerate(data_list):
+                            if 'IBEG' in raw.ch_names or 'IEND' in raw.ch_names:
+                                raw.drop_channels(['IBEG', 'IEND'])
+                                if data_type == 'pre-treatment' or data_type == 'post-treatment':
+                                    raw.drop_channels(['STI 014'])
+                                    print(f"Modified channel list: {raw.info['nchan']}, sfreq: {raw.info['sfreq']}")
+
                         data = mne.concatenate_raws(data_list.copy(), verbose='warning')
                     else:
                         data = filtered_raw
                 else:
                     # No filtering yet, just append raw data to list and concatenate
                     data_list.append(raw)
-                    if len(data_list) > 1:
+                    # Concatenate raws of same recording type and filter together
+                    if len(data_list) == len(filenames):
                         data = mne.concatenate_raws(data_list.copy(), verbose='warning')
-                        data = apply_filtering(data)
+                        data = apply_filtering(raw)
 
             try:
                 # Save the filtered data to raw MNE-Python file
@@ -338,13 +353,13 @@ class Preprocessing(object):
             if self.data_types['pre-treatment']:
                 filenames_pre = [f for f in os.listdir(self.input_path) if 'pre' in f.split('_')]
                 self.data['pre-treatment'] = filter_and_concatenate(filenames_pre, 'pre-treatment')
-                pipeline_log.info(f'Pre-treatment resting state data shape: {self.data['pre-treatment']._data.shape}')
+                pipeline_log.info(f"Pre-treatment resting state data shape: {self.data['pre-treatment']._data.shape}")
                 save_psd(pjoin(self.results_savepath, 'psd_filtered_restingstate_pre.png'), self.data['pre-treatment'])
             if self.data_types['post-treatment']:
                 filenames_post = [f for f in os.listdir(self.input_path) if 'post' in f.split('_')]
                 try:
                     self.data['post-treatment'] = filter_and_concatenate(filenames_post, 'post-treatment')
-                    pipeline_log.info(f'Post-treatment resting state data shape: {self.data['post-treatment']._data.shape}')
+                    pipeline_log.info(f"Post-treatment resting state data shape: {self.data['post-treatment']._data.shape}")
                     save_psd(pjoin(self.results_savepath, 'psd_filtered_restingstate_post.png'), self.data['post-treatment'])
                 except AttributeError:
                     pipeline_log.error(co.color('red', 'Cannot retrieve post-treatment data.'))
@@ -352,7 +367,7 @@ class Preprocessing(object):
         elif self.data_from_TMS or self.data_from_motor or self.data_from_fif:
             filenames_other = [f for f in os.listdir(self.input_path) if 'treatment' in f]
             self.data['other'] = filter_and_concatenate(filenames_other, 'other')
-            pipeline_log.info(f'Data shape: {self.data['other']._data.shape}')
+            pipeline_log.info(f"Data shape: {self.data['other']._data.shape}")
             save_psd(pjoin(self.results_savepath, 'psd_filtered.png'), self.data['other'])
 
         else:
