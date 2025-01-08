@@ -22,7 +22,6 @@ import numpy as np
 import h5py
 import multiprocessing
 import scipy.io as io
-import matplotlib
 
 import matplotlib.pyplot as plt
 from sklearn.decomposition import FastICA
@@ -44,9 +43,6 @@ import util.console_output as co
 
 # Alias useful functions
 pjoin = os.path.join
-
-# Set backend
-matplotlib.use('Agg')
 
 # Set up the pipeline log.  It is configured in the constructor below,
 # but used by the free functions outside of the class, hence its        
