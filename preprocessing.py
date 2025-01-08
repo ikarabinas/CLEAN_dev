@@ -22,6 +22,7 @@ import numpy as np
 import h5py
 import multiprocessing
 import scipy.io as io
+
 import matplotlib.pyplot as plt
 from sklearn.decomposition import FastICA
 import scipy
@@ -296,19 +297,35 @@ class Preprocessing(object):
             data_list = []
             for f in filenames:
                 raw = load_file(f)
+                print(f'Raw data shape: {raw._data.shape}')
+
+                # Ensure channels match between recordings prior to concatenation --
+                # Some recordings may contain extra channels in ch_names list.
+                if len(data_list) == len(filenames):
+                    for i, raw in enumerate(data_list):
+                        print(f"{data_type} file: {f}, channels: {raw.info['nchan']}")
+                        if 'IBEG' in raw.ch_names or 'IEND' in raw.ch_names:
+                            raw.drop_channels(['IBEG', 'IEND'])
+                            if data_type == 'pre-treatment' or data_type == 'post-treatment':
+                                raw.drop_channels(['STI 014'])
+                                print(f"Modified channel list: {raw.info['nchan']}")
 
                 # If filtering separately, apply filters to each raw dataset before concatenation
                 if self.filter_raws_separately:
                     filtered_raw = apply_filtering(raw)
                     data_list.append(filtered_raw)
+
                     if len(data_list) == len(filenames):
                         data = mne.concatenate_raws(data_list.copy(), verbose='warning')
                     else:
+                        # If there is only one file for the given recording type, assign to data
                         data = filtered_raw
                 else:
-                    # No filtering yet, just append raw data to list and concatenate
+                    # Append raw of the given recording type (e.g. 'pre-treatment') to data_list
                     data_list.append(raw)
-                    if len(data_list) > 1:
+
+                    # Concatenate raws of the same recording type and filter together
+                    if len(data_list) == len(filenames):
                         data = mne.concatenate_raws(data_list.copy(), verbose='warning')
                         data = apply_filtering(data)
 
@@ -328,7 +345,6 @@ class Preprocessing(object):
 
             except UnboundLocalError:
                 pipeline_log.error(co.color('red', 'UnboundLocalError: Verify config file input and results paths.'))
-
             return None
 
         self.data = {}
@@ -337,23 +353,31 @@ class Preprocessing(object):
         if self.data_types['resting_state']:
             if self.data_types['pre-treatment']:
                 filenames_pre = [f for f in os.listdir(self.input_path) if 'pre' in f.split('_')]
-                self.data['pre-treatment'] = filter_and_concatenate(filenames_pre, 'pre-treatment')
-                pipeline_log.info(f'Pre-treatment resting state data shape: {self.data['pre-treatment']._data.shape}')
-                save_psd(pjoin(self.results_savepath, 'psd_filtered_restingstate_pre.png'), self.data['pre-treatment'])
+                try:
+                    self.data['pre-treatment'] = filter_and_concatenate(filenames_pre, 'pre-treatment')
+                    pipeline_log.info(f"Pre-treatment resting state data shape: {self.data['pre-treatment']._data.shape}")
+                    save_psd(pjoin(self.results_savepath, 'psd_filtered_restingstate_pre.png'),
+                             self.data['pre-treatment'])
+                except AttributeError:
+                    pipeline_log.error(co.color('red', 'Cannot retrieve pre-treatment data.'))
+
             if self.data_types['post-treatment']:
                 filenames_post = [f for f in os.listdir(self.input_path) if 'post' in f.split('_')]
                 try:
                     self.data['post-treatment'] = filter_and_concatenate(filenames_post, 'post-treatment')
-                    pipeline_log.info(f'Post-treatment resting state data shape: {self.data['post-treatment']._data.shape}')
-                    save_psd(pjoin(self.results_savepath, 'psd_filtered_restingstate_post.png'), self.data['post-treatment'])
+                    pipeline_log.info(f"Post-treatment resting state data shape: {self.data['post-treatment']._data.shape}")
+                    save_psd(pjoin(self.results_savepath, 'psd_filtered_restingstate_post.png'),
+                             self.data['post-treatment'])
                 except AttributeError:
                     pipeline_log.error(co.color('red', 'Cannot retrieve post-treatment data.'))
 
-        elif self.data_from_TMS or self.data_from_motor or self.data_from_fif:
-            filenames_other = [f for f in os.listdir(self.input_path) if 'treatment' in f]
-            self.data['other'] = filter_and_concatenate(filenames_other, 'other')
-            pipeline_log.info(f'Data shape: {self.data['other']._data.shape}')
-            save_psd(pjoin(self.results_savepath, 'psd_filtered.png'), self.data['other'])
+        # Data from rTMS-EEG and single-pulse TMS-EEG are currently not supported for preprocessing.
+        # TODO: add this functionality
+        # elif self.data_from_TMS or self.data_from_motor or self.data_from_fif:
+            # filenames_other = [f for f in os.listdir(self.input_path) if 'treatment' in f]
+            # self.data['other'] = filter_and_concatenate(filenames_other, 'other')
+            # pipeline_log.info(f"Data shape: {self.data['other']._data.shape}")
+            # save_psd(pjoin(self.results_savepath, 'psd_filtered.png'), self.data['other'])
 
         else:
             raise ValueError('Data type is misspecified or does not exist in the input folder.')
@@ -583,7 +607,6 @@ class Preprocessing(object):
 
         return data
 
-
     def _artifact_subspace_reconstruction(self, data, name):
         # Run ASR
         data_cleaned = artifact_subspace_reconstruction(data, cutoff=self.asr_cutoff)
@@ -678,6 +701,7 @@ def wICA(ica, ICs, levels=5, wavelet='coif5', normalize=False,
 
     return wICs, artifacts
 
+
 # ------------- ICA Label functions ------------- #
 def iclabel(mne_raw, num_components=20, keep=["brain"], method='infomax', fit_params=dict(extended=True), reject=None):
     '''
@@ -715,6 +739,7 @@ def iclabel(mne_raw, num_components=20, keep=["brain"], method='infomax', fit_pa
     print(f'Number of ICA components excluded: {len(exclude_idx)}')
     cleaned = ica.apply(mne_raw, exclude=exclude_idx, verbose=False)
     return ic_labels, ica, cleaned
+
 
 def autoreject_bad_segments(raw, segment_length=1.0, method='autoreject'):
     # generate epochs object from raw
@@ -821,7 +846,7 @@ def save_ica_components(save_file, ica, ic_label_obj=None):
         save_file: absolute path to save PNG output file.
         ica: an MNE-Python ica object.
         ic_label_list: optional list of conformal labels from ica_label to add to plot topomap titles.
-    
+
     '''
     num_components = ica.n_components
     if ic_label_obj is not None:
@@ -885,7 +910,7 @@ def save_eog_plot(name, save_file, mne_in, channel_list=['E32', 'E241', 'E25', '
     eog_epochs = mne.preprocessing.create_eog_epochs(mne_in, ch_name=channel_list)
 
     if len(eog_epochs.events) == 0:
-        eog_picks = mne_in.pick_channels(channel_list)
+        eog_picks = mne_in.copy().pick_channels(channel_list)  # Use copy of mne_in. pick_channels operates in place.
         eog_picks.plot(show=False)
         sns.despine()
         plt.savefig(save_file)
