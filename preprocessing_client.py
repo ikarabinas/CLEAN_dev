@@ -3,7 +3,7 @@ import re
 import configparser
 import subprocess
 
-to_preprocess_datapath = '/Users/Bella/Desktop/Grosenick_Lab/eeg_patient_data/to_preprocess'
+to_preprocess_datapath = '/Users/Bella/Desktop/Grosenick_Lab/eeg_data/eeg_patient_data/to_preprocess/'
 
 
 # Takes a directory file path holding subject data that needs to be preprocessed
