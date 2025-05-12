@@ -1,26 +1,23 @@
 import os
-import pandas as pd
 import configparser
 import subprocess
+import argparse
+import re
+import tempfile
 
 '''
-Runs CLEAN batch preprocessing on EEG data
-
-Requires:
-    CSV listing participant IDs corresponding to data that needs preprocessing
-    Path to the data folder
+Runs CLEAN batch preprocessing of all EEG data from one participant
+Can be used in conjunction with a SLURM submission script for parallel processing of participant data
 '''
 # Set data paths
-eeg_datapath = '/Users/Bella/Desktop/Grosenick_Lab/eeg_data/eeg_patient_data/'
-#to_preprocess_datapath = '/athena/grosenicklab/store/tms_eeg/mdd_dlpfc/'
-#savepath = '/home/imk2003/Desktop/eeg_data/preprocessed_CLEAN_dev/'
-savepath = '/Users/Bella/Desktop/Grosenick_Lab/slurm_and_cluster_scripts/'
-subject_list_csv = '/Users/Bella/Desktop/Grosenick_Lab/slurm_and_cluster_scripts/subject_list_test.csv'
-#subject_list_csv = '/home/imk2003/Documents/subject_list_short.csv'
+eeg_datapath = '/athena/grosenicklab/store/tms_eeg/mdd_dlpfc/'
+savepath = '/home/imk2003/Desktop/eeg_data/preprocessed_CLEAN_dev/'
 
-# Read participant record_ids from csv
-subjects_df = pd.read_csv(subject_list_csv)
-ppt_ids = list(subjects_df['record_id'])
+# Parse ppt_id variable provided by submission script
+parser = argparse.ArgumentParser()
+parser.add_argument('--ppt_id', required=True)
+args = parser.parse_args()
+ppt_id = args.ppt_id
 
 
 # Returns a list of paths corresponding to tx day data for the specified partipant
@@ -45,21 +42,22 @@ def get_eeg_daypaths(ppt_id):
         print(f'No data directory found for ppt_id {ppt_id} in {eeg_datapath}')
 
 
-# Load and modify the config file
+# Load the config file and modify a temp config file for each parallel run
 def update_config(ppt_id, day, preprocess_path, savepath=savepath):
-    config_file = 'test_config.cfg'  # Specify the path to your config file
+    base_config = 'test_config.cfg'
     config = configparser.ConfigParser()
-    config.read(config_file)
+    config.read(base_config)
 
-    # Update the input_path and results_path in the config file
     config['paths']['input_path'] = preprocess_path
     results_path = os.path.join(savepath, ppt_id, day)
     config['paths']['results_path'] = results_path
     print(f'Cleaned data save path: {results_path}')
 
-    # Write the updated config back to the file
-    with open(config_file, 'w') as configfile:
+    # Write to a temp config file (unique for each run)
+    temp_config = os.path.join(tempfile.gettempdir(), f'{ppt_id}_{day}_config.cfg')
+    with open(temp_config, 'w') as configfile:
         config.write(configfile)
+    return temp_config
 
 
 # Run preprocessing.py with updated config
@@ -70,17 +68,19 @@ def run_preprocessing():
         print(f'Error during preprocessing: {e}')
 
 
-# Run preprocessing for participant IDs in subject_list_csv
-for subject in ppt_ids:
-    day_paths = get_eeg_daypaths(subject)
+# Run preprocessing on all resting state data for one participant (ppt_id),
+# Looping through days of treatment
+day_paths = get_eeg_daypaths(ppt_id)
+for day_path in day_paths:
     try:
-        for day_path in day_paths:
-            day = day_path.split('_')[-1]
-            print(f'Preprocessing subject {subject}, {day}')
-            update_config(subject, day, day_path)
-            #run_preprocessing()
-            print(f'Completed preprocessing for {subject}, {day}')
+        day_regex_matching = lambda x: re.search(r'day\d+', x).group() if re.search(r'day\d+', x) else None
+        day = day_regex_matching(day_path)
+        print(f'Preprocessing subject {ppt_id}, {day}')
+        update_config(ppt_id, day, day_path)
+        #run_preprocessing()
+        print(f'Completed preprocessing for {ppt_id}, {day}')
 
     # Exception handling for missing data
-    except TypeError:
+    except TypeError as e:
+        print(e)
         continue
