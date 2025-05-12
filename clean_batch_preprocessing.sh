@@ -17,12 +17,14 @@ mkdir -p "$LOG_DIR"
 echo -e "subject_id\tjob_id\ttimestamp" > "$TRACKING_FILE"
 
 # Read and filter subjects
-csvgrep -c 5 -m "$TMS_TARGET" "$SUBJECT_LIST" | csvcut -c 2 | tail -n +2 | while read -r subject_id; do
-    subject_id=$(echo "$record_id" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+csvcut -c 2,5 "$SUBJECT_LIST" | tail -n +2 | while IFS=',' read -r subject_id tms_target; do
+    subject_id=$(echo "$subject_id" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+    tms_target=$(echo "$tms_target" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
 
-    # Skip blank record ID entries
-    if [ -z "$subject_id" ]; then
+    # Skip entries with blank record_id or tms_target
+    if [ -z "$subject_id" ] || [ -z "$tms_target" ]; then
         continue
+
     fi
 
     # Skip already-processed subjects
@@ -33,6 +35,7 @@ csvgrep -c 5 -m "$TMS_TARGET" "$SUBJECT_LIST" | csvcut -c 2 | tail -n +2 | while
 
     # Build SLURM command. Allocate 16G of memory and 4 CPU cores per subject.
     SLURM_CMD="sbatch --mem=16G --cpus-per-task=4 \
+        --job_name=clean_{subject_id} \
         --partition=sackler-cpu,scu-cpu \
         --time=12:00:00 \
         --output=${LOG_DIR}/${subject_id}_%j.out \

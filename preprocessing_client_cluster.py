@@ -9,16 +9,35 @@ import tempfile
 Runs CLEAN batch preprocessing of all EEG data from one participant
 Can be used in conjunction with a SLURM submission script for parallel processing of participant data
 '''
-# Set data paths
-# Change eeg_datapath to reflect tms_target: mdd_dlpfc, mdd_dmpfc, ocd_dmpfc, ocd_rofc, ocd_lofc, ocd_dlpfc
-eeg_datapath = '/athena/grosenicklab/store/tms_eeg/mdd_dlpfc/'
+# Set save path for cleaned data
 savepath = '/home/imk2003/Desktop/eeg_data/preprocessed_CLEAN_dev/'
 
-# Parse ppt_id variable provided by submission script
+# Parse ppt_id and tms_target variables provided by submission script
 parser = argparse.ArgumentParser()
 parser.add_argument('--ppt_id', required=True)
+parser.add_argument('--tms_target', required=True)
 args = parser.parse_args()
+
 ppt_id = args.ppt_id
+tms_target = args.tms_target.lower()
+
+
+def define_data_dir(ppt_id, tms_target):
+    if ppt_id[0].lower() == 'm':
+        diagnosis = 'mdd'
+    elif ppt_id[0].lower() == 'c':
+        diagnosis = 'ocd'
+    else:
+        raise ValueError(f'Unrecognized diagnosis prefix in ppt_id: {ppt_id}')
+
+    dir_name = f'{diagnosis}_{tms_target}'
+    return os.path.join('/athena/grosenicklab/store/tms_eeg', dir_name)
+
+
+# Dynamically set EEG data path
+eeg_datapath = define_data_dir(ppt_id, tms_target)
+print(f'[INFO] ppt_id: {ppt_id}, tms_target: {tms_target}')
+print(f'[INFO] eeg data path: {eeg_datapath}')
 
 
 # Returns a list of paths corresponding to tx day data for the specified partipant
@@ -61,12 +80,12 @@ def update_config(ppt_id, day, preprocess_path, savepath=savepath):
     return temp_config
 
 
-# Run preprocessing.py with updated config
-def run_preprocessing():
+# Run preprocessing.py with updated temp config
+def run_preprocessing(config_path):
     try:
-        subprocess.run(['python', 'preprocessing.py'], check=True)
+        subprocess.run(['python', 'preprocessing.py', '--config', config_path], check=True)
     except subprocess.CalledProcessError as e:
-        print(f'Error during preprocessing: {e}')
+        print(f'[ERROR] Error during preprocessing: {e}')
 
 
 # Run preprocessing on all resting state data for one participant (ppt_id),
@@ -74,14 +93,18 @@ def run_preprocessing():
 day_paths = get_eeg_daypaths(ppt_id)
 for day_path in day_paths:
     try:
-        day_regex_matching = lambda x: re.search(r'day\d+', x).group() if re.search(r'day\d+', x) else None
-        day = day_regex_matching(day_path)
+        # Extract treatment day from path
+        match = re.search(r'day\d+', day_path)  # matches 'day1' etc in path name
+        if not match:
+            print(f'[WARNING] Could not extract tx day info from path: {day_path}')
+            continue
+        day = match.group()
         print(f'Preprocessing subject {ppt_id}, {day}')
-        update_config(ppt_id, day, day_path)
-        run_preprocessing()
-        print(f'Completed preprocessing for {ppt_id}, {day}')
 
-    # Exception handling for missing data
-    except TypeError as e:
-        print(e)
+        # Update temp config and run preprocessing
+        config_path = update_config(ppt_id, day, day_path)
+        run_preprocessing(config_path)
+        print(f'Completed preprocessing for {ppt_id}, {day}')
+    except Exception as e:
+        print(f'[ERROR] Skipping preprocessing for {ppt_id} {day}. Error: {e}')
         continue
