@@ -1,22 +1,23 @@
 #!/bin/bash
 # Batch preprocess EEG with CLEAN pipeline for a list of participant IDs
 
+# Load environment
+source ~/.bashrc
+mamba activate mne_env
+
 SUBJECT_LIST="/home/imk2003/Documents/subject_list_test.csv"
-PREPROCESSING_CLIENT_SCRIPT="/home/imk2003/Documents/GitHub/CLEAN_dev/preprocessing_client_cluster.py"
+PREPROCESSING_CLIENT_SCRIPT="/home/imk2003/Documents/github/CLEAN_dev/preprocessing_client_cluster.py"
 SAVEPATH="/home/imk2003/Desktop/eeg_data/preprocessed_CLEAN_dev/"
 LOG_DIR="/home/imk2003/Desktop/eeg_data/preprocessed_CLEAN_dev/logs/"
 TRACKING_FILE="clean_preprocessing_job_tracking.tsv"
 
-# Modify to filter for treatment target: DLPFC, DMPFC, ROFC, LOFC (case sensitive)
-TMS_TARGET="DLPFC"
-
 # Set to true to simulate submission without running sbatch
-DRY_RUN=true 
+DRY_RUN=false 
 
 mkdir -p "$LOG_DIR"
 echo -e "subject_id\tjob_id\ttimestamp" > "$TRACKING_FILE"
 
-# Read and filter subjects
+# Read subject ID and TMS target info
 csvcut -c 2,5 "$SUBJECT_LIST" | tail -n +2 | while IFS=',' read -r subject_id tms_target; do
     subject_id=$(echo "$subject_id" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
     tms_target=$(echo "$tms_target" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
@@ -35,12 +36,12 @@ csvcut -c 2,5 "$SUBJECT_LIST" | tail -n +2 | while IFS=',' read -r subject_id tm
 
     # Build SLURM command. Allocate 16G of memory and 4 CPU cores per subject.
     SLURM_CMD="sbatch --mem=16G --cpus-per-task=4 \
-        --job_name=clean_{subject_id} \
+        --job-name=c_$subject_id \
         --partition=sackler-cpu,scu-cpu \
         --time=12:00:00 \
         --output=${LOG_DIR}/${subject_id}_%j.out \
         --error=${LOG_DIR}/${subject_id}_%j.err \
-        --wrap=\"python ${PREPROCESSING_CLIENT_SCRIPT} --ppt_id ${subject_id}\""
+        --wrap=\"python ${PREPROCESSING_CLIENT_SCRIPT} --ppt_id ${subject_id} --tms_target ${tms_target}\""
 
     # Submit job or test with dry run
     if [ "$DRY_RUN" = true ]; then

@@ -104,7 +104,6 @@ for day_path in day_paths:
         # Update temp config and run preprocessing
         config_path = update_config(ppt_id, day, day_path)
         run_preprocessing(config_path)
-        print(f'Completed preprocessing for {ppt_id}, {day}')
     except Exception as e:
         print(f'[ERROR] Skipping preprocessing for {ppt_id} {day}. Error: {e}')
         continue
