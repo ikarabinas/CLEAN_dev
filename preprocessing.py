@@ -943,10 +943,13 @@ def save_autoreject_plot(save_file, epochs, ar_obj):
 # Main                                                                                                               
 
 if __name__ == '__main__':
-    # Parse command line                                                                                             
-    from argparse import ArgumentParser
-    from argparse import SUPPRESS
-    parser = ArgumentParser()
+    # Parse config file
+    import argparse
 
-    pred_pipeline = Preprocessing('test_config.cfg')
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--config', required=True)
+    args = parser.parse_args()
+
+    pred_pipeline = Preprocessing(args.config)
+
     pred_pipeline.run()
