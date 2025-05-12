@@ -7,6 +7,9 @@ SAVEPATH="/home/imk2003/Desktop/eeg_data/preprocessed_CLEAN_dev/"
 LOG_DIR="/home/imk2003/Desktop/eeg_data/preprocessed_CLEAN_dev/logs/"
 TRACKING_FILE="clean_preprocessing_job_tracking.tsv"
 
+# Modify to filter for treatment target: DLPFC, DMPFC, ROFC, LOFC (case sensitive)
+TMS_TARGET="DLPFC"
+
 # Set to true to simulate submission without running sbatch
 DRY_RUN=true 
 
@@ -14,7 +17,7 @@ mkdir -p "$LOG_DIR"
 echo -e "subject_id\tjob_id\ttimestamp" > "$TRACKING_FILE"
 
 # Read and filter subjects
-csvcut -c 2 "$SUBJECT_LIST" | tail -n +2 | while read -r record_id; do
+csvgrep -c 5 -m "$TMS_TARGET" "$SUBJECT_LIST" | csvcut -c 2 | tail -n +2 | while read -r subject_id; do
     subject_id=$(echo "$record_id" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
 
     # Skip blank record ID entries

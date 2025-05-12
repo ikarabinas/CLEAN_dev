@@ -10,6 +10,7 @@ Runs CLEAN batch preprocessing of all EEG data from one participant
 Can be used in conjunction with a SLURM submission script for parallel processing of participant data
 '''
 # Set data paths
+# Change eeg_datapath to reflect tms_target: mdd_dlpfc, mdd_dmpfc, ocd_dmpfc, ocd_rofc, ocd_lofc, ocd_dlpfc
 eeg_datapath = '/athena/grosenicklab/store/tms_eeg/mdd_dlpfc/'
 savepath = '/home/imk2003/Desktop/eeg_data/preprocessed_CLEAN_dev/'
 
@@ -77,7 +78,7 @@ for day_path in day_paths:
         day = day_regex_matching(day_path)
         print(f'Preprocessing subject {ppt_id}, {day}')
         update_config(ppt_id, day, day_path)
-        #run_preprocessing()
+        run_preprocessing()
         print(f'Completed preprocessing for {ppt_id}, {day}')
 
     # Exception handling for missing data
