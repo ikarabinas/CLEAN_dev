@@ -1,9 +1,11 @@
 #!/bin/bash
 # Batch preprocess EEG with CLEAN pipeline for a list of participant IDs
 
-# Load environment
+# Load environment and define temp dir location
 source ~/.bashrc
 mamba activate mne_env
+export TMPDIR=/athena/grosenicklab/scratch/imk2003/tmp
+mkdir -p $TMPDIR
 
 SUBJECT_LIST="/home/imk2003/Documents/subject_list_test.csv"
 PREPROCESSING_CLIENT_SCRIPT="/home/imk2003/Documents/github/CLEAN_dev/preprocessing_client_cluster.py"
@@ -14,6 +16,7 @@ TRACKING_FILE="clean_preprocessing_job_tracking.tsv"
 # Set to true to simulate submission without running sbatch
 DRY_RUN=false 
 
+# Create log dir and write tracking file
 mkdir -p "$LOG_DIR"
 echo -e "subject_id\tjob_id\ttimestamp" > "$TRACKING_FILE"
 
