@@ -46,9 +46,9 @@ def get_eeg_daypaths(ppt_id):
 
     # Account for ppt_ids with crossover naming
     if 'crossover' in ppt_id:
-	subject = ppt_id.split('_')[0]
+        subject = ppt_id.split('_')[0]
     else:
-	subject = ppt_id
+        subject = ppt_id
 
     try:
         # Filter eeg_datapath directories that match the specified participant ID
