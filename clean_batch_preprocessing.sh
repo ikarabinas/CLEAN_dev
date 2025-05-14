@@ -7,10 +7,10 @@ mamba activate mne_env
 export TMPDIR=/athena/grosenicklab/scratch/imk2003/tmp
 mkdir -p $TMPDIR
 
-SUBJECT_LIST="/home/imk2003/Documents/subject_list_test.csv"
+SUBJECT_LIST="/home/imk2003/Documents/subject_list_short.csv"
 PREPROCESSING_CLIENT_SCRIPT="/home/imk2003/Documents/github/CLEAN_dev/preprocessing_client_cluster.py"
-SAVEPATH="/home/imk2003/Desktop/eeg_data/preprocessed_CLEAN_dev/"
-LOG_DIR="/home/imk2003/Desktop/eeg_data/preprocessed_CLEAN_dev/logs/"
+SAVEPATH="/athena/grosenicklab/scratch/imk2003/preprocessed_CLEAN_dev/"
+LOG_DIR="/athena/grosenicklab/scratch/imk2003/preprocessed_CLEAN_dev/logs/"
 TRACKING_FILE="clean_preprocessing_job_tracking.tsv"
 
 # Set to true to simulate submission without running sbatch

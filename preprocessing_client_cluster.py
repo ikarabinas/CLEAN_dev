@@ -10,7 +10,7 @@ Runs CLEAN batch preprocessing of all EEG data from one participant
 Can be used in conjunction with a SLURM submission script for parallel processing of participant data
 '''
 # Set save path for cleaned data
-savepath = '/home/imk2003/Desktop/eeg_data/preprocessed_CLEAN_dev/'
+savepath = '/athena/grosenicklab/scratch/imk2003/preprocessed_CLEAN_dev/'
 
 # Parse ppt_id and tms_target variables provided by submission script
 parser = argparse.ArgumentParser()
@@ -43,13 +43,20 @@ print(f'[INFO] eeg data path: {eeg_datapath}')
 # Returns a list of paths corresponding to tx day data for the specified partipant
 def get_eeg_daypaths(ppt_id):
     subject_day_paths = []
+
+    # Account for ppt_ids with crossover naming
+    if 'crossover' in ppt_id:
+	subject = ppt_id.split('_')[0]
+    else:
+	subject = ppt_id
+
     try:
         # Filter eeg_datapath directories that match the specified participant ID
-        ppt_dir = str([folder for folder in os.listdir(eeg_datapath) if ppt_id in folder][0])
+        ppt_dir = str([folder for folder in os.listdir(eeg_datapath) if subject in folder][0])
         ppt_dir_path = os.path.join(eeg_datapath, ppt_dir)
 
         # Create a list of directory names within the participant folder and sort in order of days
-        ppt_day_data = [folder for folder in os.listdir(ppt_dir_path) if ppt_id in folder and 'day' in folder]
+        ppt_day_data = [folder for folder in os.listdir(ppt_dir_path) if subject in folder and 'day' in folder]
         ppt_day_data.sort(key=lambda x: x.split('_')[-1])  # selects 'dayx' portion of dir name for sorting
 
         for day_dir in ppt_day_data:
@@ -69,7 +76,7 @@ def update_config(ppt_id, day, preprocess_path, savepath=savepath):
     config.read(base_config)
 
     config['paths']['input_path'] = preprocess_path
-    results_path = os.path.join(savepath, ppt_id, day)
+    results_path = os.path.join(savepath, f'{ppt_id}_{tms_target}', day)
     config['paths']['results_path'] = results_path
     print(f'Cleaned data save path: {results_path}')
 
